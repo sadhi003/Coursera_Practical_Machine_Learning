@@ -1,6 +1,5 @@
 ---
 title: "Practical Machine Learing Final Project on Human Activity Recognition"
-author: "Shankar Adhikari"
 date: "May 23, 2015"
 output: html_document
 ---

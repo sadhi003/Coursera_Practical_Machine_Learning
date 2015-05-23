@@ -1,0 +1,172 @@
+---
+title: "Practical Machine Learing Final Project on Human Activity Recognition"
+author: "Shankar Adhikari"
+date: "May 23, 2015"
+output: html_document
+---
+
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+The aim of this report was to use data from accelerometers placed on the belt, forearm, arm, and dumbell of six participants to predict how well they were doing the exercise in terms of the classification in the data. More information is available from the website: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).  
+
+# Loading Data and Processing
+
+The following libraries will be used in the entire data processing and anlysis.
+```{r, message = FALSE, warning = F}
+library(caret)
+library(corrplot)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+library(knitr)
+library(randomForest)
+```
+
+
+Set the seed to reproduce the result.
+```{r}
+set.seed(1234)
+```
+
+```{r, eval= FALSE}
+
+# Data download and keep in the working directory using these commands.
+if (!file.exists("data")) {dir.create("data")}
+# file URL and destination file
+fileUrl1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+destfile1 <- "./data/pml-training.csv"
+fileUrl2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+destfile2 <- "./data/pml-testing.csv"
+# download the file and note the time
+download.file(fileUrl1, destfile = destfile1)
+download.file(fileUrl2, destfile = destfile2)
+dateDownloaded <- date()
+```
+
+Assuming data folder is in same directory with the markdown file and have the train and test data set.
+Load the train and test data set.
+
+```{r}
+# train set
+training_set <- read.csv("./data/pml-training.csv", na.strings= c("NA","","#DIV/0!"))
+# test set
+testing_set <- read.csv("./data/pml-testing.csv", na.strings= c("NA","","#DIV/0!"))
+```
+
+```{r}
+# Delete the column with all missing values
+training_set <- training_set[, colSums(is.na(training_set)) == 0]
+testing_set <- testing_set[, colSums(is.na(testing_set)) == 0]
+```
+
+For our project some variables are just the identifier and are irrelevent, can remove.
+
+```{r}
+training <- training_set[, -c(1:7)]
+testing <- testing_set[, -c(1:7)]
+```
+
+In order to perform the cross-validation, the training data set is partitioned into two subset,
+subtrain and subtest having 75% and 25% data respectively.
+
+```{r}
+sampling <- createDataPartition(y = training$classe, p = 0.75, list = FALSE)
+subtrain <- training[sampling,]
+subtest <- training[-sampling,]
+```
+
+# Exploratory analysis and Model Development
+
+Let us produce a correlation plot to see the variables relationship with each other.
+
+```{r, fig.height = 6, fig.width = 8}
+# plot a correlation matrix
+correlMatrix <- cor(subtrain[, -length(subtrain)])
+corrplot(correlMatrix, order = "FPC", method = "circle", type = "lower", tl.cex = 0.8,  tl.col = rgb(0, 0, 0))
+```
+
+In this plot the dark red and blue colors indicate a highly correlated variables and there is not much concern on those, so include all the variables into the model.
+
+Let us see the frequency of output variable "classe" in the data by plotting bar plot. 
+```{r}
+plot(subtrain$classe, col = "blue", main = "Bar plot the variable classe taking the subtrain data", xlab = "classe levels", ylab = "Frequency")
+```
+
+From the graph, it seems the frequency for each level is in the same order beside for level A, which has higher. 
+
+## Prediction Model:Using decision tree
+Let us develop a model using decision tree, make prediction and plot the decision tree.
+
+```{r, fig.height = 6, fig.width = 8}
+model1 <- rpart(classe ~. , data = subtrain, method = "class")
+prediction1 <- predict(model1, subtest, type = "class")
+rpart.plot(model1, main = "Classification Tree", extra = 102, under = TRUE, faclen = 0)
+```
+
+Make the confusion matrix using the subtest data result.
+
+```{r}
+confusionMatrix(prediction1, subtest$classe)
+```
+
+## Prediction Model: Using random forest
+
+```{r}
+model2 <- randomForest(classe ~. , data = subtrain , method = "class")
+prediction2 <- predict(model2, subtest, type = "class")
+confusionMatrix(prediction2, subtest$classe)
+```
+
+## Conclusion:
+
+Model based on Random Forest perform better than Decision Tree. 
+Accuracy for RF model has 0.9992 (95% CI:(0.9927,0.9969)), compared to 0.739 (95% CL:(0.7269,0.7516)) from DT model. Thus model based on Random Forest is more better, and is choosen. The accuracy of the model is 0.9992. The expected out-of-sample error is 0.005. With above accuracy that we get from cross-validation data, we can now confidently apply onto the real test data. 
+```{r}
+predictfinal <- predict(model2, testing, type = "class")
+predictfinal
+```
+
+## Submission
+
+```{r}
+# Write file for submission
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i, ".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  } 
+}
+pml_write_files(predictfinal)
+```
+
+## Reference
+
+[1] Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human ’13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
